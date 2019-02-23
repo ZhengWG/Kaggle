@@ -1,0 +1,452 @@
+#+LATEX_HEADER: \usepackage{xeCJK}
+#+LATEX_HEADER: \setCJKmainfont{SimSun}
+#+OPTIONS: toc:nil
+* Keras介绍与练习
+主要结合Keras[[https://keras.io/zh/][官方文档]] ,对Keras结构以及几个基本案例作简单的介绍，方便自己今后回顾查阅.
+
+本文软件环境：Python3.6; Tensorflow1.12.0; Keras2.2.4 
+* Keras结构
+** Keras基本网络结构 
+Keras网络层公用函数:
++ =layer.get_weights()= :权重格式为Numpy数组
++ =layer.set_weights(weights)=
++ =layer.get_config()=: 返回包含层配置的字典，可通过得到的配置对层进行重定义
+另外，对于单节点层可以得到输入张量、输出张量、输入尺寸、输出尺寸:
++ =layer.input=
++ =layer.output=
++ =layer.input_shape=
++ =layer.output_shape=
+对于多节点层：
++ =layer.get_input_at(node_index)=
++ =layer.get_output_at(node_index)=
++ =layer.get_input_shape_at(node_index)=
++ =layer.get_output_shape_at(node_index)=
+** Keras网络配置
+1) 核心网络层
+   * Dense:实现的操作： =output=activation(dot(input, kernal) + bias)= ,通常作全连接层使用，输入通常为 =(batch_size, input_dim)= 的2D输入(会被展平为1维再进行点乘).
+   * Activation:激活层，可通过activation参数传递或者定义单独的激活层,激活函数包括有 =tanh= , =softmax= , =relu= , =sigmoid= , =selu= 等，可参照[[https://keras.io/zh/activations/][Activation函数]].
+   * Dropout:随机失活，防止过拟合，rate=[0,1],可参照[[http://www.jmlr.org/papers/volume15/srivastava14a/srivastava14a.pdf][Dropout文献]].
+   * Flatten:将输入展平，不影响批量大小.通常作为卷积层到全连接层的过渡.
+   * Input:将Keras张量实例化作为输入.
+   * Reshape:将输入Shape转换为指定size的Shape.
+   * Permute:按照给定的模型对输入维度进行置换，如RGB->GBR，以及将RNN和CNN连接在一起.
+   * RepeatVector:将输入重复 n 次，如(,32)->(3,32),复制3份.
+   * Lamda:将表达式封装为层对象，对数据操作，如 =model.add(Lamda(lamda x: x**2))= 为生成一个x->x^2的层.
+   * ActivityRegularizer:基于其损失函数值，可选l1，l2正则.
+   * Masking:对数据进行Mask操作，通常用于覆盖特定时间步数据.
+   * SpatialDropout:Droupout的Spacial版本,对应有1d,2d,3d版本,分别直接丢弃1d,2d,3d特征图进行正则化，通常适应于前后数据有强关联性的场景.
+2) 卷积层
+   * Conv1D:单个空间(时间)维上的层输入进行卷积，通过 =use_bias= 和 =activation= 设置偏置向量和激活函数.
+   * Cov2D:图像等的二维卷积.
+   * SeparableConv1D:深度方向的可分的1D卷积，先执行深度方向的空间卷积，混合各个通道进行逐点卷积.
+   * SeparableConv2D:深度方向的可分的2d卷积.
+   * DepwiseConv2D:深度可分离2D卷积，只进行深度方向的一步卷积操作.
+   * Conv2DTranpose:转置卷积层,卷积输出变卷积输入.
+   * Conv3D:3D卷积,如立体空间卷积，同样有 =use_bias= 和 =activation= 参数.
+   * Conv3DTranpose:3D转置卷积层.
+   * Cropping1D:1D输入的裁剪层(如时间序列)，开始或结束裁剪的单元数.
+   * Cropping2D:2D输入的裁剪层.
+   * Cropping3D:3D数据的裁剪层.
+   * UpSampling1D:1D输入的上采样层,沿着时间重复 =size= 次.
+   * Upsampling2D:2D输入的上采样层,沿着数据的行列进行复制.
+   * Upsampling3D:3D输入的上采样层,沿着数据的第1,2,3维度进行复制.
+   * ZeroPadding1D:1D输入的零填充层，在数据的开头或结尾进行填充.
+   * Zeropadding2D:2D输入的零填充层,分别在数据的顶部、底部、左侧、右侧进行添加.
+   * Zeropadding3D:3D数据的零填充层.
+3) 池化层
+   * MaxPooling1D:1D时序数据的最大池化.
+   * MaxPooling2D:空间数据的最大池化.
+   * MaxPooling3D:对于3D(空间,或者时空间)数据的最大化.
+   * AveragePooling1D:对时序数据的平均池化.
+   * AveragePooling2D:对于空间数据的平均池化.
+   * AveragePooling3D:对于3D（空间，或者时空间）数据的平均池化.
+   * GlobalMaxPooling1D:对于时序数据的全局最大池化.
+   * GlobalAveragePooling1D:对于时序数据的全局平均池化.
+   * GlobalMaxPooling2D:对于空域数据的全局最大池化.
+   * GlobalAveragePooling2D:对于空域数据的全局平均池化.
+   * GlobalMaxPooling3D:对于3D数据的全局最大池化.
+   * GlobalAveragePooling3D:对于3D数据的全局平均池化.
+4) 局部连接层
+   * LocallyConnected1D:类似于卷积层，但是权值不共享，即输入的不同区域权值不同.
+   * LocallyConnected2D:2D输入的局部连接层.
+5) 循环层
+   * RNN:循环网络层基类.
+   * SimpleRNN:全连接的RNN，其输出将被反馈到输入.
+   * GRU:门限循环单元网络(Gated Recurrent Unit)
+   * LSTM:长短期记忆网络层.
+   * ConvLSTM2D:卷积LSTM,类似于LSTM,但输入变换和循环变换都是卷积的.
+   * SimpleRNNCell:SimpleRNN的单元类.
+   * GRUCell:GRU的单元类.
+   * LSTMCell:LSTM的单元类.
+   * CudnnGRU:有CuDNN支持的快速GRU实现，后端需为Tensorflow.
+   * CudnnLSTM:有cudnn支持的快速LSTM实现，后端需为tensorflow.
+6) 嵌入层
+   * Embedding:将正整数(索引值)转换为固定尺寸的稠密向量，如:[[4,],[20,]]->[[0.25,0.1],[0.6,-0.2]],该层只能作为模型的第一层.可参考[[https://arxiv.org/abs/1512.05287][A Theoretically Grounded Application of Dropout in Recurrent Neural Networks]]
+7) 融合层
+   * Add:计算输入张量列表的和,要求尺寸一致.
+   * Subtract:计算输入张量列表的差.
+   * Multiply:计算输入张量列表的乘积(逐元素).
+   * Average:计算输入张量列表的平均值,返回一个张量.
+   * Maximum:计算输入张量列表的最大值.
+   * Concatenate:连接一个输入张量的列表.
+   * Dot:计算两个张量之间的样本点积.
+   * add: =Add= 层的函数式接口.
+   * subtract: =Subtract= 层的函数式接口.
+   * multiply: =Multiply= 层的函数式接口.
+   * average: =Average= 层的函数式接口.
+   * maximum: =Maximum= 层的函数式接口.
+   * concatenate: =Concatenate= 层的函数式接口.
+   * dot: =Dot= 层的函数式接口.
+8) 高级激活层
+   * LeakyReLU:带泄露的ReLU,防止神经元死亡.可参考[[https://web.stanford.edu/~awni/papers/relu_hybrid_icml2013_final.pdf][Rectifier Nonlinearities Improve Neural Network Acoustic Models]]
+   * PReLU:参数化的ReLU，可参考[[https://arxiv.org/abs/1502.01852][Delving Deep into Rectifiers: Surpassing Human-Level Performance on ImageNet Classification]]
+   * ELU:指数线性单元,可参考[[https://arxiv.org/abs/1511.07289v1][Fast and Accurate Deep Network Learning by Exponential Linear Units (ELUs)]]
+   * ThresholdedReLU:带阈值的修正线性单元,可参考[[http://arxiv.org/abs/1402.3337][Zero-Bias Autoencoders and the Benefits of Co-Adapting Features]]
+   * Softmax:Softmax激活函数.
+   * Relu:Relu函数,使用默认值时，它返回逐个元素的max(x,0).
+9) 标准化层
+   * BatchNormalization:批量标准化层,标准化前一层的激活项，可参考[[http://de.arxiv.org/pdf/1502.03167][Batch Normalization: Accelerating Deep Network Training by  Reducing Internal Covariate Shift]]
+10) 噪声层
+    * GaussianNoise:应用以0为中心的加性高斯噪声,在克服过拟合时比较有用,可认为通过随机数据提升起正则化数据的层.
+    * GaussianDropout:应用以1为中心的乘性高斯噪声,正则化层,只在训练中被激活.
+    * AlphaDropout:Alpha Dropout能够保持输入的平均值和方差不变,即在droupout后能够实现自我归一化.
+11) 层封装器
+    * TimeDistributed:这个封装器将一个层应用于输入的每个时间片,输入至少为3d,且第一维度为时间(首个维度为0维度).
+    * Bidirectional:RNN的双向的封装器,对序列进行前后和后向计算.
+** Keras预处理
+1) 序列预处理
+   * TimeseriesGenerator:生成批量时序数据,输入为一系列等间隔以及时间序列参数汇集的数据点,用于生成训练/验证的批次数据.
+   * pad_sequences:将多个序列截断或补齐为相同长度.
+   * skipgrams:生成skipgram词对,skipgram词对可参照[[http://arxiv.org/pdf/1301.3781v3.pdf][Efficient Estimation of Word Representations in Vector Space]]
+   * make_sampling_table:生成一个基于单词的概率采样表.
+2) 文本预处理(PS.对文本处理不是很了解)
+   * Tokenizer:文本标记类,将文本转化为整数序列或者向量.
+   * hasing_trick:将文本转化为固定大小散列空间中的所索引序列.
+   * one_hot:One-hot编码,将文本编码为大小为n的单词索引列表.
+   * text_to_word_sequence:将文本转换为单词(或标记)的序列.
+3) 图片预处理
+   * ImageDataGenerator:通过实时数据增强生成张量图像数据批次,数据将不断循环.
+   * ImageDataGenerator类方法:
+     * apply_transform:根据给定参数将变换应用于图像.
+     * fit:将数据生成器用于某些示例数据,基于样本数据计算与数据转换相关的内部数据统计.
+     * flow:采集数据和标签数组,生成批量增强数据.
+     * flow_from_dataframe:输入dataframe和目录的路径,并生成批量的增强/标准化数据.
+     * flow_from_directory:
+     * get_random_transform:为转换生成随机参数.
+     * random_transform:将随机变换应用于图像.
+     * standardize:将标准化配置应用与一批输入.
+** 优化函数
+1) 损失函数
+编译模型需要选定损失函数和优化器: 
+#+BEGIN_SRC python
+  model.compile(loss='loss_function', optimizer='optmizer')
+  # 具体可如下调用:
+  model.compile(loss='mean_squared_error', optimizer='sgd')
+  # 或者
+  from keras import losses
+  model.compile(loss=losses.mean_squared_error, optimizer='sgd')
+
+#+END_SRC
+损失函数包括: =categorical_crossentropy=, =sparse_categorical_crossentropy=,
+=binary_crossentropy=, =kullback_leibler_divergence=, =poisson=,
+=cosine_proximity=.
+2) 评价函数
+评价函数参数为 =metrics=,模型建立如下:
+#+BEGIN_SRC python
+  model.compile(loss='mean_squared_error',
+                optimizer='sgd',
+                metrics=['mae', 'acc'])
+  # 或者
+  from keras import metrics
+  model.compile(loss='mean_squared_error',
+                optimizer='sgd',
+                metrics=[metrics.mae, metrics.categorical_accuracy])
+#+END_SRC
+可使用的评价函数有: =binary_accuracy=, =categorical_accuracy=, 
+=sparse_categorical_accuracy=, =top_k_categorical_accuracy=,
+=spase_top_k_categorical_accuracy=.
+
+也可以自定义评价函数:
+#+BEGIN_SRC python
+  import keras.backend as K
+  def mean_pred(y_true, y_pred):
+      return K.mean(y_pred)
+
+  model.compile(optimizer='rmsprop',
+                loss='binary_crossentropy',
+                metrics=['accuracy', mean_pred])
+#+END_SRC
+3) 优化器
+优化器决定了模型的优化方法,优化器的使用方式如下:
+#+BEGIN_SRC python
+  from keras import optimizers
+
+  model = Sequential()
+  model.add(Dense(64, kernel_initializer='uniform', input_shape=(10,)))
+  model.add(Activation('softmax'))
+
+  sgd = optimizers.SGD(lr=0.01, decay=1e-6, momentum=0.9, nesterov=True)
+  model.compile(loss='mean_squared_error', optimizers=sgd)
+  # 也可以通过名称直接调用优化器,使用的是默认参数
+  # model.compile(loss='mean_squared_error', optimizer='sgd')
+#+END_SRC
+通过参数 =clipnorm=, =clipvalue= 可以控制梯度裁剪(Gradient Clipping):
+#+BEGIN_SRC python
+from keras import optimizers
+# clipnorm:所有参数将被裁剪,其l2范数最大为1:g*1/max(1, l2_norm)
+sgd = optimizers.SGD(lr=0.01, clipnorm=1.)
+
+# clipvalue:梯度值将被裁剪到数值范围内: 最大值为0.5,最小值为-0.5
+from keras import optimizers
+sgd = optimizers.SGD(lr=0.01, clipvalue=0.5)
+#+END_SRC
+常用的优化器方法有: =SGD=, =RMSprop=, =ADagrad=, =Adadelta=, =Adam=,
+=Adamx=, =Nadam=.
+4) 激活函数
+激活函数通过 =activation= 参数调用:
+#+BEGIN_SRC python
+  from keras.layer import Activation, Dense
+  model.add(Dense(64))
+  model.add(Activation('tanh'))
+  # 或者
+  model.add(Dense(64, activation='tanh'))
+  # 可以传递Tensorflow函数
+  from keras import backend as K
+  model.add(Dense(64, activation=K.tanh))
+  model.add(Activation(K.tanh))
+#+END_SRC
+预定义的激活函数包括: =softmax=, =elu=, =selu=, =softplus=, =softsign=, 
+=relu=, =tanh=, =sigmoid=, =hard_sigmoid=, =exponential=, =linear=
+5) 回调函数
+*回调函数*为keras的一个特色模块,为一系列在训练阶段中使用的函数,可用于查看训练模型的内在状态与统计.
+   * Callback: =keras.callbacks.Callback()= 函数用于组建新的回调函数的抽象基类.
+   * BaseLogger: =keras.callbacks.Baselogger(stateful_metrics=None)=,会累积训练轮平均评估的回调函数,该函数会自动应用到每个keras模型上.
+   * TerminateOnNaN: =keras.callbacks.TerminateOnNaN()=,当遇到NaN损失会停止训练的回调函数.
+   * ProgbarLogger: 
+   #+BEGIN_SRC python
+     keras.callbacks.Progbarlogger(count_mode='samples',stateful_metrics=None)
+   #+END_SRC
+   会把评估以标准输出打印的回调函数
+   * History: =keras.callbacks.History()=, 把所有事件都记录到 =History= 对象的回调函数.
+   * ModelCheckpoint: 
+     #+BEGIN_SRC python
+       keras.callbacks.ModelCheckpoint(filepath, monitor='val_loss', verbose=0, save_best_only=False, save_weights_only=False, mode='auto', period=1)
+     #+END_SRC
+     在每个训练期之后保存模型,filepath可以通过 =epoch= 值和 =logs= 键定义,如 =filepath= 为 =weights.{epoch:02d}-{val_loss:.2f}.hdf5=,则模型保存的时候会有训练轮数和验证损失.
+   * EarlyStopping:当被监测的数量不再提升,则停止训练:
+
+     #+BEGIN_SRC python
+       keras.callbacks.EarlyStopping(monitor='val_loss', min_delta=0, patience=0, verbose=0, mode='auto', baseline=None, restore_best_weights=False)
+     #+END_SRC
+   * RemoteMonitor: 将事件数据流到服务器的回调函数(需要 =request= 库):
+     #+BEGIN_SRC python
+       keras.callbacks.RemoteMonitor(root='http://localhost:9000', path='/publish/epoch/end/', field='data', headers=None, send_as_json=False)
+     #+END_SRC
+   * LearningRateScheduler: =keras.callbacks.LearningRateScheduler(schedule, verbose=0)=,学习速率定时器.
+   * TensorBoard: Tensorboard基本可视化:
+     #+BEGIN_SRC python
+       keras.callbacks.TensorBoard(log_dir='./logs', histogram_freq=0, batch_size=32, write_graph=True, write_grads=False, write_images=False, embeddings_freq=0, embeddings_layer_names=None, embeddings_metadata=None, embeddings_data=None, update_freq='epoch')
+     #+END_SRC
+   * ReduceLROnPlateau:当标准评估停止提升时,降低学习速率:
+     #+BEGIN_SRC python
+       keras.callbacks.ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=10, verbose=0, mode='auto', min_delta=0.0001, cooldown=0, min_lr=0)
+       # 应用举例
+       reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.2,
+                                     patience=5, min_lr=0.0001)
+       model.fit(X_train, Y_train, callbacks=[reduce_lr])
+     #+END_SRC
+   * CSVLogger: 把训练结果数据流到csv文件:
+     #+BEGIN_SRC python
+       keras.callbacks.CSVLogger(filename, separator =',' append=False)
+       # 应用举例
+       csv_logger = CSVLogger('training.log')
+       model.fit(X_train, Y_train, callbacks=[csv_logger])
+     #+END_SRC
+   * LamdaCallback:训练进行中创建简单的,自定义的回调函数的回调函数:
+     #+BEGIN_SRC python
+       # 函数定义
+       keras.callbacks.LambdaCallback(on_epoch_begin=None, on_epoch_end=None, on_batch_begin=None, on_batch_end=None, on_train_begin=None, on_train_end=None)
+       # 应用举例, lambda参数为调用的回调函数
+       # 在每一个批开始时，打印出批数。
+       batch_print_callback = LambdaCallback(
+           on_batch_begin=lambda batch,logs: print(batch))
+
+       # 把训练轮损失数据流到 JSON 格式的文件。文件的内容
+       # 不是完美的 JSON 格式，但是时每一行都是 JSON 对象。
+       import json
+       json_log = open('loss_log.json', mode='wt', buffering=1)
+       json_logging_callback = LambdaCallback(
+           on_epoch_end=lambda epoch, logs: json_log.write(
+               json.dumps({'epoch': epoch, 'loss': logs['loss']}) + '\n'),
+           on_train_end=lambda logs: json_log.close()
+       )
+
+       # 在完成模型训练之后，结束一些进程。
+       processes = ...
+       cleanup_callback = LambdaCallback(
+           on_train_end=lambda logs: [
+               p.terminate() for p in processes if p.is_alive()])
+
+       model.fit(...,
+                 callbacks=[batch_print_callback,
+                            json_logging_callback,
+                            cleanup_callback])
+     #+END_SRC
+   * 创建自己的回调函数:可以通过扩展 =keras.callbacks.Callback= 基类来创建自定义回调函数,通过类属性 =self.model=, 回调函数可以获得其联系的模型.
+     简单的例子如下,用以训练时,保存一个列表的批量损失值:
+     #+BEGIN_SRC python
+       # 记录损失历史
+       class LossHistory(keras.callbacks.Callback):
+           def on_train_begin(self, logs={}):
+               self.losses = []
+
+           def on_batch_end(self, batch, logs={}):
+               self.losses.append(logs.get('loss'))
+
+       model = Sequential()
+       model.add(Dense(10, input_dim=784, kernel_initializer='uniform'))
+       model.add(Activation('softmax'))
+       model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
+
+       history = LossHistory()
+       model.fit(x_train, y_train, batch_size=128, epochs=20, verbose=0, callbacks=[history])
+
+       print(history.losses)
+
+       # 输出:[0.66047596406559383, 0.3547245744908703, ..., 0.25953155204159617, 0.25901699725311789]
+
+       # 模型检查点
+       from keras.callbacks import ModelCheckpoint
+
+       model = Sequential()
+       model.add(Dense(10, input_dim=784, kernel_initializer='uniform'))
+       model.add(Activation('softmax'))
+       model.compile(loss='categorical_crossentropy', optimizer='rmsprop')
+
+       # 如果验证损失下降， 那么在每个训练轮之后保存模型。
+       checkpointer = ModelCheckpoint(filepath='/tmp/weights.hdf5', verbose=1, save_best_only=True)
+       model.fit(x_train, y_train, batch_size=128, epochs=20, verbose=0, validation_data=(X_test, Y_test), callbacks=[checkpointer])
+     #+END_SRC
+6) 初始化器
+初始化器主要对各层权重进行初始化操作,初始化设置通过关键词进行设置: =kernel_initializer= 和 =bias_initializer= :
+初始化器是 =keras.initializers= 模块的一部分, =keras.initializers.Initializer()= 为初始化器基类.
+
+可用的初始化器(初始化策略不同):Zeros(全为0),Ones(全为1),Constant(全为一个常数),
+RandomNormal(正态分布的随机张量),RandomUniform(均匀分布的随机张量),TruncatedNormal(截尾正态分布的随机张量),
+VarianceScaking(根据权值尺寸调整其规模),Orthogonal(随机正交矩阵),Identity(随机正交矩阵),
+Iecun_unform(LeCun均匀初始化器),glorot_normal(Glorot正态分布初始化器),glorot_uniform(Glorot均匀分布初始化器),
+he_normal(He正态分布初始化器),lecun_normal(leCun正态初始化器),he_uniform(He均匀方差缩放初始化器).
+
+当然,也可以自定义初始化器:
+#+BEGIN_SRC python
+  from keras import backend as K
+
+  def my_init(shape, dtype=None):
+      return K.random_normal(shape, dtype=dtype)
+
+  model.add(Dense(64, kernel_initializer=my_init))
+#+END_SRC
+
+#+BEGIN_SRC python
+  model.add(Dense(64, kernel_initializer='random_uniform', bias_initializer='zeros'))
+#+END_SRC
+7) 正则化器
+正则化主要用于限制参数,防止模型过拟合.
+可以分别对参数权重,偏置,输出进行惩罚,对应的关键字参数分别为:
+=kernel_regularizer= , =bias_regularizer= , =activity_regularizer= ,
+三者均为 =keras.regularizers.Regularizer= 的实例.
+
+可用的正则化器有: =keras.regularizers.l1(0.)= , =keras.regularizers.l2(0.)= , ~keras.regularizers.l1_l2(l1=0.,l2=0.)~
+
+也可自己设计正则化器:
+#+BEGIN_SRC python
+  from keras import backend as K
+
+  def l1_reg(weight_matrix):
+      return 0.01*K.sum(K.abs(weight_matrix))
+
+  model.add(Dense(64, input_dim=64, kernel_regularizer=l1_reg))
+#+END_SRC
+8) 约束项
+约束项主要提供了层参数的约束,根据对象开放两个关键词参数:
+=kernel_constraint= , =bias_constraint= ,分别对主权重矩阵和偏置进行约束.
+
+可用的约束有:MaxNorm(最大范数权值约束),NonNeg(权重非负约束),
+UnitNorm(隐具有单位范数),MinMaxNorm(最小/最大范数权值约束)
+** Keras工具
+1) 数据集:keras自带的数据集有:CIFAR10 小图像分类数据集,CIFAR100 小图像分类数据集,IMDB 电影评论情感分类数据集,路透社新闻主题分类,MNIST 手写字符数据集,Fashion-MNIST 时尚物品数据集,Boston 房价回归数据集.
+2) 预训练模型:[[https://keras.io/zh/applications/#xception][Xception]] , [[https://keras.io/zh/applications/#vgg16][VGG16]] , [[https://keras.io/zh/applications/#vgg19][VGG19]] , [[https://keras.io/zh/applications/#resnet50][ResNet50]] , [[https://keras.io/zh/applications/#inceptionv3][InceptionV3]] , [[https://keras.io/zh/applications/#inceptionresnetv2][InceptionResNetV2]] , [[https://keras.io/zh/applications/#mobilenet][MobileNet]] , [[https://keras.io/zh/applications/#densenet][DenseNet]] , [[https://keras.io/zh/applications/#nasnet][NASNet]] , [[https://keras.io/zh/applications/#mobilenetv2][MobileNetV2]]
+3) 模型可视化:
+ =keras.utils.vis_utils= 提供了Keras模型可视化模块 =graphviz=
+
+绘制模型图,渲染实例如下:
+#+BEGIN_SRC python
+  from keras.utils import plot_model
+  plot_model(model, to_file='model.png')
+  # 四个参数:show_shapes,show_layer_names,expand_dim,dip
+
+  from IPython.display import SVG
+  from keras.utils.vis_utils import model_to_dot
+  SVG(model_to_dot(model).create(prog='dot', format='svg'))
+#+END_SRC
+训练历史可视化,通过 =fit= 函数返回的 =History= 对象,可用 =matplotlib= 进行可视化:
+#+BEGIN_SRC python
+  import matplotlib.pyplot as plt
+
+  history = model.fit(x, y, validation_split=0.25, epochs=50, batch_size=16, verbose=1)
+
+  # 绘制训练 & 验证的准确率值
+  plt.plot(history.history['acc'])
+  plt.plot(history.history['val_acc'])
+  plt.title('Model accuracy')
+  plt.ylabel('Accuracy')
+  plt.xlabel('Epoch')
+  plt.legend(['Train', 'Test'], loc='upper left')
+  plt.show()
+
+  # 绘制训练 & 验证的损失值
+  plt.plot(history.history['loss'])
+  plt.plot(history.history['val_loss'])
+  plt.title('Model loss')
+  plt.ylabel('Loss')
+  plt.xlabel('Epoch')
+  plt.legend(['Train', 'Test'], loc='upper left')
+  plt.show()
+#+END_SRC
+* Keras模型训练与微调代码
+** 编写自己的Layer
+实现自己的keras层只需要重新编写三个函数:
++ =build(input_shape)= :定义权重的地方.
++ =call(x)= :编写层的功能逻辑.
++ =compute_output_shape(input_shape)= :定义更改输入向量的形状变换逻辑.
+简单的例子如下：
+#+BEGIN_SRC python
+  from keras import backend as K
+  from keras.engine.topology import Layer
+
+  class MyLayer(Layer):
+      
+      def __init__(self, output_dim, **kwargs):
+          self.output_dim = output_dim
+          # super函数调用父类方法
+          super(MyLayer, self).__init__(**kwargs)
+          
+      def build(self, input_shape):
+          assert isinstance(input_shape, list)
+          # 为该层创建一个可训练的权重
+          self.kernel = self.add_weight(name='kernel',
+                                        shape=(input_shape[0][1], self.output_dim),
+                                        initializer='unifornm',
+                                        trainable=True)
+          super(MyLayer, self).build(input_shape)
+          
+      def call(self, x):
+          assert isinstance(x, list)
+          a, b = x
+          return [K.dot(a, self.kernel)+b, K.mean(b, axis=-1)]
+          
+      def compute_output_shape(self, input_shape):
+          assert isinstance(input_shape, list)
+          shape_a, shape_b = input_shape
+          return [(shape_a[0], self.output_dim), shape_b[:,-1]]
+#+END_SRC
