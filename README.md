@@ -1,5 +1,6 @@
 # 简介
 Kaggle相关代码
+
 **Competition_test**:
 于Minist数据集下的代码,具体包括数据降维(Dimensionality Reduction)、简单多层神经网络实现(MLP)、dcnn+SVM实现
 
